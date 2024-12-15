@@ -13,6 +13,10 @@ module kanari_network::liquiditypool {
     use moveos_std::event;
     use moveos_std::account;
     use moveos_std::timestamp;
+    use rooch_framework::account_coin_store;
+    use rooch_framework::coin::{Coin};
+    use moveos_std::signer;
+    use rooch_framework::transfer;
 
     use rooch_framework::coin_store::{Self, CoinStore};
     use kanari_network::balance::{Balance};
@@ -32,17 +36,17 @@ module kanari_network::liquiditypool {
         amount: u64
     }
 
-     // Added key ability constraint to CoinTypeA and CoinTypeB
-    struct Pool<phantom CoinTypeA: key, phantom CoinTypeB: key> {
-        id: UID,
-        coin_a: Object<CoinStore<CoinTypeA>>,  // Changed from CoinStore to Object<CoinStore>
-        coin_b: Object<CoinStore<CoinTypeB>>,  // Changed from CoinStore to Object<CoinStore>
+    // Add key + store abilities to Pool struct
+    struct Pool<phantom CoinTypeA: key + store, phantom CoinTypeB: key + store> has key, store {
+        coin_a: Object<CoinStore<CoinTypeA>>,
+        coin_b: Object<CoinStore<CoinTypeB>>,
         reserve_a: u64,
         reserve_b: u64,
         total_supply: u64,
         lp_shares: SimpleMap<address, u64>,
         fee_percentage: u64,
     }
+    
     
     struct AddLiquidity<phantom CoinTypeA: key + store, phantom CoinTypeB: key + store> {
         pool: Pool<CoinTypeA, CoinTypeB>,
@@ -57,12 +61,13 @@ module kanari_network::liquiditypool {
 
 
     // Event emitted when liquidity is added
-    struct AddLiquidityEvent has copy, drop {
+    struct AddLiquidityEvent has drop, copy {
         provider: address,
         amount_a: u64,
         amount_b: u64,
-        liquidity: u64,
+        liquidity: u64
     }
+
 
     public fun add_liquidity<CoinTypeA: key + store, CoinTypeB: key + store>(
         pool: &mut Pool<CoinTypeA, CoinTypeB>,
@@ -73,7 +78,6 @@ module kanari_network::liquiditypool {
         amount_a_min: u64,
         amount_b_min: u64,
         deadline: u64,
-        ctx: &mut TxContext
     ): (u64, u64, u64) {
         // Check deadline
         assert!(timestamp::now_seconds() <= deadline, ERR_EXPIRED);
@@ -118,8 +122,52 @@ module kanari_network::liquiditypool {
     
         (amount_a, amount_b, liquidity)
     }
+
+
     
 
+    
+    // public entry fun add_liquidity_entry<CoinTypeA: key + store, CoinTypeB: key + store>(
+    //     pool: Pool<CoinTypeA, CoinTypeB>,
+    //     amount_a_desired: u64,
+    //     amount_b_desired: u64,
+    //     amount_a_min: u64,
+    //     amount_b_min: u64,
+    //     deadline: u64,
+    // ) {
+    //     let sender = tx_context::sender();
+
+    //     // Create coin stores
+    //     let coin_store_a = coin_store::create_coin_store<CoinTypeA>();
+    //     let coin_store_b = coin_store::create_coin_store<CoinTypeB>();
+    
+
+    //     let (amount_a, amount_b, liquidity) = add_liquidity(
+    //         &mut pool,
+    //         &mut coin_store_a,
+    //         &mut coin_store_b,
+    //         amount_a_desired,
+    //         amount_b_desired,
+    //         amount_a_min,
+    //         amount_b_min,
+    //         deadline,
+    //     );
+    
+    //     // Emit event
+    //     event::emit(AddLiquidityEvent {
+    //         provider: sender,
+    //         amount_a,
+    //         amount_b,
+    //         liquidity
+    //     });
+    
+    //     // Transfer coin stores
+    //     coin_store::transfer(coin_store_a, sender);
+    //     coin_store::transfer(coin_store_b, sender);
+
+
+      
+    // }
 
     fun calculate_liquidity(
         amount_a: u64,
